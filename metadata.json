@@ -1,0 +1,8 @@
+{
+  "name": "EduLead Pro CRM",
+  "description": "A comprehensive Lead Management System for Educational Consultancies with multi-channel acquisition, RBAC, and AI-driven insights.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

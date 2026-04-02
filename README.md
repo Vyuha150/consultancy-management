@@ -3,7 +3,7 @@
 ## 🚀 Standalone Next.js Application with MongoDB
 
 Full-stack CRM platform for education consultancy with built-in API routes - **no separate backend server needed!**
-
+change1
 ---
 
 ## ✅ Quick Start

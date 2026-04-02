@@ -1,0 +1,5 @@
+# Python Dependencies for Backend
+fastapi
+uvicorn[standard]
+pymongo
+python-dotenv

@@ -1,0 +1,84 @@
+---
+config:
+  layout: fixed
+---
+flowchart TB
+ subgraph subGraph0["EEG Pipeline"]
+    direction TD
+        B["EEG Preprocessing"]
+        B_sub["Band-pass filtering, ICA / Artifact removal, Re-referencing, Epoch segmentation"]
+  end
+ subgraph subGraph1["MRI / fMRI Pipeline"]
+    direction TD
+        M["MRI / fMRI Acquisition"]
+        M_S["Structural Preprocessing"]
+        M_S_sub["Skull stripping, Spatial normalization, Segmentation , Cortical thickness"]
+        M_F["Functional Preprocessing"]
+        M_F_sub["Realignment / Motion correction, Slice timing correction, Smoothing, ICA / Connectivity"]
+  end
+ subgraph FE_Group["Dual-Modality Features"]
+    direction TB
+        C_ML["<b>ML Features</b><br>EEG: Time/Freq/Connectivity<br>MRI: Voxel volumes, Cortical thickness, Connectome metrics"]
+        C_DL["<b>DL Features</b><br>EEG: Raw signal to CNN / Spectrograms to VGG<br>MRI: 3D CNN on volumetric data / Autoencoders"]
+  end
+ subgraph CL_Group["Models"]
+    direction TB
+        E_ML["<b>ML Models</b><br>SVM, Random Forest / XGBoost, Logistic Regression"]
+        E_DL["<b>DL Models</b><br>Softmax output, Hybrid CNN + SVM fusion"]
+  end
+    B --- B_sub
+    M --> M_S & M_F
+    M_S --- M_S_sub
+    M_F --- M_F_sub
+    B --> C["Feature Extraction"]
+    M_S --> C
+    M_F --> C
+    C --- C_ML & C_DL
+    C_ML --> D["Feature Selection / Dimensionality Reduction"]
+    C_DL --> D
+    D --- D_sub["PCA / ICA, mRMR, LASSO / Elastic-Net, ANOVA, RFE"]
+    D --> E["Classification / Prediction Model"]
+    E --- E_ML & E_DL
+    E_ML --> F["Output / Interpretation"]
+    E_DL --> F
+    F --- F_sub["Predicted class / Diagnosis, Probabilistic score, Activation / Relevance / Anomaly maps"]
+    n1[" "]
+    n2[" "]
+    n3[" "]
+    n4[" "]
+    n5[" "]
+
+    n1@{ img: "https://i.ibb.co/LD0cCKjL/Screenshot-2025-12-09-205112.png", h: 200, w: 200, pos: "b"}
+    n2@{ img: "https://i.ibb.co/gFW8LMgS/images.png", h: 210, w: 234, pos: "b"}
+    n3@{ img: "https://i.ibb.co/r9xts9x/images-1.png", h: 225, w: 369, pos: "b"}
+    n4@{ img: "https://i.ibb.co/N6v3VjfC/Screenshot-2025-12-09-211755.png", h: 200, w: 258, pos: "b"}
+    n5@{ img: "https://i.ibb.co/XkG4xXHP/images-15.jpg", h: 200, w: 272, pos: "b"}
+     B:::featMain
+     B_sub:::eegProc
+     M:::mriAcq
+     M_S:::featMain
+     M_S_sub:::mriProcS
+     M_F:::featMain
+     M_F_sub:::mriProcF
+     C_ML:::featSub
+     C_DL:::featSub
+     E_ML:::classSub
+     E_DL:::classSub
+     C:::featMain
+     D:::featMain
+     D_sub:::featSub
+     E:::classMain
+     F:::output
+     F_sub:::output
+    classDef eegAcq fill:#fde0dc,stroke:#e57373,color:#c62828      %% Soft Pink/Red
+    classDef mriAcq fill:#e3f2fd,stroke:#64b5f6,color:#1565c0      %% Soft Blue
+    classDef eegProc fill:#fff3e0,stroke:#ffb74d,color:#d84315,stroke-dasharray: 5 5 %% Soft Peac
+    classDef mriProcS fill:#e8f5e9,stroke:#81c784,color:#388e3c,stroke-dasharray: 5 5 %% Soft Gree
+    classDef mriProcF fill:#d1c4e9,stroke:#9575cd,color:#4527a0,stroke-dasharray: 5 5 %% Soft Lavender 
+    classDef featMain fill:#fff9c4,stroke:#fbc02d,color:#f57f17    %% Yellow Header
+    classDef featSub fill:#fffde7,stroke:#fff176,color:#f9a825,stroke-dasharray: 5 5 %% Lighter Yellow Sub
+    classDef classMain fill:#c7e6c9,stroke:#2e7d32,color:#1b5e20   %% Muted Green Header
+    classDef classSub fill:#e8f5e9,stroke:#81c784,color:#388e3c,stroke-dasharray: 5 5 %% Lighter Muted Green Sub
+    classDef output fill:#b2dfdb,stroke:#00695c,color:#004d40     %% Teal Final Output
+    style FE_Group fill:none,stroke:none
+    style CL_Group fill:none,stroke:none

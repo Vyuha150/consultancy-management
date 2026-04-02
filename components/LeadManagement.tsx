@@ -98,9 +98,11 @@ const LeadManagement: React.FC<LeadManagementProps> = ({ onLeadClick, currentUse
     pipeline: 'NEW'
   });
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfiles, setUserProfiles] = useState<any[]>([]);
   const [profileCheckLoading, setProfileCheckLoading] = useState(false);
-  
-  // Advanced Filters State
+  const [editingProfile, setEditingProfile] = useState<any>(null);
+  const [showCreateProfile, setShowCreateProfile] = useState(false);
+    // Advanced Filters State
   const [filters, setFilters] = useState({
     source: '',
     pipeline: '',
@@ -129,10 +131,9 @@ const LeadManagement: React.FC<LeadManagementProps> = ({ onLeadClick, currentUse
       if (response.ok) {
         const data = await response.json();
         const profiles = Array.isArray(data.profiles) ? data.profiles : [];
-        const myProfile = profiles.find(p => p.counselorId === currentUserId);
-        if (myProfile) {
-          setUserProfile(myProfile);
-        }
+        const myProfiles = profiles.filter(p => p.counselorId === currentUserId);
+        setUserProfiles(myProfiles);
+        setUserProfile(myProfiles[0] || null);
       }
     } catch (err) {
       console.error('Error fetching profile:', err);
@@ -467,12 +468,75 @@ const LeadManagement: React.FC<LeadManagementProps> = ({ onLeadClick, currentUse
       }
 
       setProfileSuccess('Profile uploaded successfully.');
+      // Reset form for new profile
+      setProfileData({ fullName: '', mobile: '', email: '', aadhar: '' });
+      setDocFiles({
+        marksheet: null,
+        certificate: null,
+        transcript: null,
+        consolidated: null,
+        resume: null,
+        sop: null,
+        passport: null
+      });
+      setLorFiles([null]);
+      setEditingProfile(null);
+      setShowCreateProfile(false);
     } catch (err: any) {
       setProfileError(err?.message || 'Failed to upload profile.');
     } finally {
       setProfileUploading(false);
       fetchUserProfile();
     }
+  };
+
+  const handleEditProfile = (profile: any) => {
+    setEditingProfile(profile);
+    setProfileData({
+      fullName: profile.fullName,
+      mobile: profile.mobile,
+      email: profile.email,
+      aadhar: profile.aadhar
+    });
+    setShowCreateProfile(true);
+  };
+
+  const handleDeleteProfile = async (profileId: string) => {
+    if (!window.confirm('Are you sure you want to delete this profile and all its documents?')) {
+      return;
+    }
+
+    setProfileUploading(true);
+    try {
+      const response = await fetch(`/api/counselor-profile?profileId=${profileId}`, {
+        method: 'DELETE'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete profile');
+      }
+      setProfileSuccess('Profile deleted successfully');
+      fetchUserProfile();
+    } catch (err: any) {
+      setProfileError(err?.message || 'Failed to delete profile');
+    } finally {
+      setProfileUploading(false);
+    }
+  };
+
+  const handleNewProfile = () => {
+    setEditingProfile(null);
+    setProfileData({ fullName: '', mobile: '', email: '', aadhar: '' });
+    setDocFiles({
+      marksheet: null,
+      certificate: null,
+      transcript: null,
+      consolidated: null,
+      resume: null,
+      sop: null,
+      passport: null
+    });
+    setLorFiles([null]);
+    setShowCreateProfile(true);
   };
 
 
@@ -519,172 +583,231 @@ const LeadManagement: React.FC<LeadManagementProps> = ({ onLeadClick, currentUse
 
       {isCounselor && (
         <>
-          {userProfile && (
-            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-[32px] border border-emerald-200 shadow-sm p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h2 className="text-lg font-black text-emerald-900">Your Profile Status</h2>
-                  <p className="text-sm text-emerald-700 mt-1">Profile: <span className="font-bold">{userProfile.fullName}</span></p>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-emerald-200">
-                  <div className={`w-2 h-2 rounded-full ${
-                    userProfile.status === 'Verified' ? 'bg-emerald-500' : 
-                    userProfile.status === 'Rejected' ? 'bg-rose-500' : 
-                    'bg-amber-500'
-                  }`} />
-                  <span className="text-xs font-bold text-emerald-700">{userProfile.status || 'Pending'}</span>
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <div className="text-[10px] font-bold text-emerald-600 uppercase">Documents</div>
-                  <div className="text-2xl font-black text-emerald-900 mt-1">{userProfile.totalDocs}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-emerald-600 uppercase">LOR Files</div>
-                  <div className="text-2xl font-black text-emerald-900 mt-1">{userProfile.lorCount}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-emerald-600 uppercase">Last Upload</div>
-                  <div className="text-xs font-semibold text-emerald-700 mt-1">{userProfile.lastUpload ? new Date(userProfile.lastUpload).toLocaleDateString() : 'Never'}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-emerald-600 uppercase">Created</div>
-                  <div className="text-xs font-semibold text-emerald-700 mt-1">{new Date(userProfile.createdAt).toLocaleDateString()}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
+          {/* Profile List */}
           <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-6">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div className="flex items-center justify-between mb-6">
               <div>
-                <h2 className="text-lg font-black text-slate-900">{userProfile ? 'Update Profile' : 'Create Your Profile'}</h2>
-                <p className="text-sm text-slate-500">{userProfile ? 'Update your details and upload additional documents.' : 'Verify personal details and upload student documents.'}</p>
+                <h2 className="text-lg font-black text-slate-900">My Student Profiles</h2>
+                <p className="text-sm text-slate-500">Create and manage multiple student profiles with documents.</p>
               </div>
               <button
-                onClick={handleProfileUpload}
-                disabled={profileUploading}
-                className="px-6 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 disabled:opacity-60"
+                onClick={handleNewProfile}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700"
               >
-                {profileUploading ? 'Uploading...' : userProfile ? 'Update Profile' : 'Create Profile'}
+                <Plus size={16} /> New Profile
               </button>
             </div>
 
-          {profileError && (
-            <div className="mt-4 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl flex items-center gap-3">
-              <AlertCircle size={18} />
-              <span>{profileError}</span>
+            {userProfiles.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText size={48} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-slate-500 font-semibold">No profiles yet</p>
+                <p className="text-slate-400 text-sm mt-1">Create your first student profile to get started</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="px-4 py-3 font-bold text-slate-600">Name</th>
+                      <th className="px-4 py-3 font-bold text-slate-600">Email</th>
+                      <th className="px-4 py-3 font-bold text-slate-600">Docs</th>
+                      <th className="px-4 py-3 font-bold text-slate-600">Status</th>
+                      <th className="px-4 py-3 font-bold text-slate-600">Created</th>
+                      <th className="px-4 py-3 text-right font-bold text-slate-600">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {userProfiles.map((profile) => (
+                      <tr key={profile.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-semibold text-slate-900">{profile.fullName}</td>
+                        <td className="px-4 py-3 text-slate-600">{profile.email}</td>
+                        <td className="px-4 py-3"><span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-lg text-xs font-bold">{profile.totalDocs}/7</span></td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                            profile.status === 'Verified' ? 'bg-emerald-100 text-emerald-700' :
+                            profile.status === 'Rejected' ? 'bg-rose-100 text-rose-700' :
+                            'bg-amber-100 text-amber-700'
+                          }`}>
+                            {profile.status || 'Pending'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{new Date(profile.createdAt).toLocaleDateString()}</td>
+                        <td className="px-4 py-3 text-right flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleEditProfile(profile)}
+                            className="px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProfile(profile.id)}
+                            className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold hover:bg-rose-100"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Create/Edit Profile Modal */}
+          {showCreateProfile && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+              <div className="w-full max-w-2xl bg-white rounded-[32px] shadow-2xl max-h-[90vh] overflow-y-auto">
+                <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-[32px]">
+                  <h2 className="text-lg font-black text-slate-900">
+                    {editingProfile ? `Edit Profile - ${editingProfile.fullName}` : 'Create New Profile'}
+                  </h2>
+                  <button
+                    onClick={() => setShowCreateProfile(false)}
+                    className="p-2 bg-slate-100 rounded-xl hover:bg-slate-200"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {profileError && (
+                    <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-2xl flex items-center gap-3">
+                      <AlertCircle size={18} />
+                      <span>{profileError}</span>
+                    </div>
+                  )}
+
+                  {profileSuccess && (
+                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-2xl flex items-center gap-3">
+                      <CheckCircle size={18} />
+                      <span>{profileSuccess}</span>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Personal Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Full Name</label>
+                        <input
+                          type="text"
+                          value={profileData.fullName}
+                          onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
+                          className="w-full mt-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Enter full name"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Mobile</label>
+                        <input
+                          type="tel"
+                          value={profileData.mobile}
+                          onChange={(e) => setProfileData({ ...profileData, mobile: e.target.value })}
+                          className="w-full mt-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Enter mobile number"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Email</label>
+                        <input
+                          type="email"
+                          value={profileData.email}
+                          onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                          className="w-full mt-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Enter email"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase">Aadhar</label>
+                        <input
+                          type="text"
+                          value={profileData.aadhar}
+                          onChange={(e) => setProfileData({ ...profileData, aadhar: e.target.value })}
+                          className="w-full mt-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          placeholder="Enter Aadhar number"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4">Required Documents</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {[
+                        { key: 'marksheet', label: 'Marksheet' },
+                        { key: 'certificate', label: 'Certificate / Provisional' },
+                        { key: 'transcript', label: 'Transcript' },
+                        { key: 'consolidated', label: 'Consolidated Marks Memo' },
+                        { key: 'resume', label: 'Resume' },
+                        { key: 'sop', label: 'Statement of Purpose' },
+                        { key: 'passport', label: 'Passport' }
+                      ].map((doc) => (
+                        <label key={doc.key} className="flex flex-col gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                          <span className="text-xs font-bold text-slate-700">{doc.label}</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            onChange={(e) => setDocFiles({
+                              ...docFiles,
+                              [doc.key]: e.target.files?.[0] || null
+                            })}
+                            className="text-xs"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">LOR Documents</h3>
+                      <button
+                        onClick={() => setLorFiles((prev) => [...prev, null])}
+                        className="flex items-center gap-2 text-xs font-bold text-indigo-600"
+                      >
+                        <Plus size={14} /> Add Another LOR
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {lorFiles.map((file, idx) => (
+                        <label key={idx} className="flex flex-col gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                          <span className="text-xs font-bold text-slate-700">LOR #{idx + 1}</span>
+                          <input
+                            type="file"
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            onChange={(e) => {
+                              const next = [...lorFiles];
+                              next[idx] = e.target.files?.[0] || null;
+                              setLorFiles(next);
+                            }}
+                            className="text-xs"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="sticky bottom-0 bg-slate-50 border-t border-slate-100 px-6 py-4 flex items-center gap-2 justify-end rounded-b-[32px]">
+                  <button
+                    onClick={() => setShowCreateProfile(false)}
+                    className="px-6 py-2 bg-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-300"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleProfileUpload}
+                    disabled={profileUploading}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 disabled:opacity-60"
+                  >
+                    {profileUploading ? 'Uploading...' : editingProfile ? 'Update Profile' : 'Create Profile'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
-
-          {profileSuccess && (
-            <div className="mt-4 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-2xl flex items-center gap-3">
-              <CheckCircle size={18} />
-              <span>{profileSuccess}</span>
-            </div>
-          )}
-
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase">Full Name</label>
-              <input
-                type="text"
-                value={profileData.fullName}
-                onChange={(e) => setProfileData({ ...profileData, fullName: e.target.value })}
-                className="w-full mt-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Enter full name"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase">Mobile</label>
-              <input
-                type="tel"
-                value={profileData.mobile}
-                onChange={(e) => setProfileData({ ...profileData, mobile: e.target.value })}
-                className="w-full mt-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Enter mobile number"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase">Email</label>
-              <input
-                type="email"
-                value={profileData.email}
-                onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                className="w-full mt-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Enter email"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase">Aadhar</label>
-              <input
-                type="text"
-                value={profileData.aadhar}
-                onChange={(e) => setProfileData({ ...profileData, aadhar: e.target.value })}
-                className="w-full mt-2 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                placeholder="Enter Aadhar number"
-              />
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">Required Documents</h3>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[
-                { key: 'marksheet', label: 'Marksheet' },
-                { key: 'certificate', label: 'Certificate / Provisional' },
-                { key: 'transcript', label: 'Transcript' },
-                { key: 'consolidated', label: 'Consolidated Marks Memo' },
-                { key: 'resume', label: 'Resume' },
-                { key: 'sop', label: 'Statement of Purpose' },
-                { key: 'passport', label: 'Passport' }
-              ].map((doc) => (
-                <label key={doc.key} className="flex flex-col gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                  <span className="text-xs font-bold text-slate-700">{doc.label}</span>
-                  <input
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    onChange={(e) => setDocFiles({
-                      ...docFiles,
-                      [doc.key]: e.target.files?.[0] || null
-                    })}
-                    className="text-xs"
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-6">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest">LOR Documents</h3>
-              <button
-                onClick={() => setLorFiles((prev) => [...prev, null])}
-                className="flex items-center gap-2 text-xs font-bold text-indigo-600"
-              >
-                <Plus size={14} /> Add Another LOR
-              </button>
-            </div>
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {lorFiles.map((file, idx) => (
-                <label key={idx} className="flex flex-col gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-4">
-                  <span className="text-xs font-bold text-slate-700">LOR #{idx + 1}</span>
-                  <input
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    onChange={(e) => {
-                      const next = [...lorFiles];
-                      next[idx] = e.target.files?.[0] || null;
-                      setLorFiles(next);
-                    }}
-                    className="text-xs"
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
         </>
       )}
 
